@@ -1,6 +1,7 @@
 <?php
 /** Расширение для класса PDO
  *
+ * @version 1.1
  * @author Insys <intsystem88@gmail.com>
  * @copyright (c) 2013, Insys
  * @link https://github.com/InSys/pdo-extended
