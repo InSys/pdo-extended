@@ -1,5 +1,4 @@
 <?php
-
 /** Расширение для класса PDO
  *
  * @author Insys <intsystem88@gmail.com>
@@ -7,11 +6,12 @@
  * @link https://github.com/InSys/pdo-extended
  * @license http://opensource.org/licenses/GPL-2.0 The GNU General Public License (GPL-2.0)
  */
-
 class PDOExtended extends PDO{
-	public function __construct($dsn, $username = null, $password = null, $driver_options = array()){
-		if(isset($driver_options[PDO::ATTR_PERSISTENT])){
-			trigger_error(__METHOD__.': PDOExtended can not work with PDO::ATTR_PERSISTENT', E_USER_WARNING);
+
+	public function __construct($dsn, $username = null, $password = null, $driver_options = array())
+	{
+		if (isset($driver_options[PDO::ATTR_PERSISTENT])) {
+			trigger_error(__METHOD__ . ': PDOExtended can not work with PDO::ATTR_PERSISTENT', E_USER_WARNING);
 			unset($driver_options[PDO::ATTR_PERSISTENT]);
 		}
 
@@ -23,15 +23,21 @@ class PDOExtended extends PDO{
 
 		$this->exec("SET NAMES utf8");
 		$this->exec("SET sql_mode='STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE'");
+		$this->exec("SET time_zone = '+0:00'");
+
+		$this->statisticCount	 = 0;
+		$this->statisticTime	 = 0;
 	}
 
 	/** Получить результат SQL_CALC_FOUND_ROWS
 	 *
 	 * @return integer
 	 */
-	public function calcFoundRows(){
+	public function calcFoundRows()
+	{
 		$result = $this->query('SELECT FOUND_ROWS()');
-		$rowCount = (int) $result->fetchColumn();
+		
+		$rowCount = (int)$result->fetchColumn();
 
 		return $rowCount;
 	}
@@ -42,24 +48,24 @@ class PDOExtended extends PDO{
 	 * @param array $driver_options
 	 * @return PDOExtendedStatement
 	 */
-	public function prepare($statement, $driver_options = array()){
+	public function prepare($statement, $driver_options = array())
+	{
 		$result = false;
 
-		try{
+		try {
 			$result = parent::prepare($statement, $driver_options);
-		}catch(PDOException $exception){
+		} catch (PDOException $exception) {
 
 		}
 
-		if($result){
+		if ($result) {
 			//Возвращаем подготовленный запрос
 			return $result;
-		}else{
+		} else {
 			//Генерируем пустой запрос
 			return false;
 		}
 	}
-
 
 	/** Выполнить запрос и вернуть данные
 	 *
@@ -67,21 +73,20 @@ class PDOExtended extends PDO{
 	 * @param array $params
 	 * @return PDOExtendedStatement
 	 */
-	public function query($statement, $params = array()){
+	public function query($statement, $params = array())
+	{
 		$result = null;
 
-		$timer_start = microtime(true);
+		if (!is_array($params) || count($params) == 0) {
+			$timerStart	 = microtime(true);
+			$result		 = parent::query($statement);
+			$timerFinish = microtime(true);
 
-		if(!is_array($params) || count($params) == 0){
-			$result = parent::query($statement);
-		}else{
+			$this->_statisticTimeAdd($timerFinish - $timerStart);
+			$this->_statisticCountIncriment();
+		} else {
 			$result = $this->prepare($statement)->execute($params);
 		}
-
-		$timer_finish = microtime(true);
-
-		$this->_statisticTimeAdd($timer_finish - $timer_start);
-		$this->_statisticCountIncriment();
 
 		return $result;
 	}
@@ -92,21 +97,20 @@ class PDOExtended extends PDO{
 	 * @param array $params
 	 * @return integer
 	 */
-	public function exec($statement, $params = array()){
+	public function exec($statement, $params = array())
+	{
 		$result = null;
 
-		$timer_start = microtime(true);
+		if (!is_array($params) || count($params) == 0) {
+			$timerStart	 = microtime(true);
+			$result		 = parent::exec($statement);
+			$timerFinish = microtime(true);
 
-		if(!is_array($params) || count($params) == 0){
-			return parent::exec($statement);
-		}else{
-			return $this->prepare($statement)->execute($params)->rowCount();
+			$this->_statisticTimeAdd($timerFinish - $timerStart);
+			$this->_statisticCountIncriment();
+		} else {
+			$result = $this->prepare($statement)->execute($params)->rowCount();
 		}
-
-		$timer_finish = microtime(true);
-
-		$this->_statisticTimeAdd($timer_finish - $timer_start);
-		$this->_statisticCountIncriment();
 
 		return $result;
 	}
@@ -117,12 +121,13 @@ class PDOExtended extends PDO{
 	 * @param array $params placeholders
 	 * @return array
 	 */
-	public function getAll($statement, $params = array()){
+	public function getAll($statement, $params = array())
+	{
 		$result = $this->query($statement, $params);
 
-		if($result->isExecuted()){
+		if ($result->isExecuted()) {
 			return $result->fetchAll();
-		}else{
+		} else {
 			return array();
 		}
 	}
@@ -133,35 +138,37 @@ class PDOExtended extends PDO{
 	 * @param array $params placeholders
 	 * @return array
 	 */
-	public function getRow($statement, $params = array()){
+	public function getRow($statement, $params = array())
+	{
 		$result = $this->query($statement, $params);
 
-		if($result->isExecuted()){
+		if ($result->isExecuted()) {
 			return $result->fetch();
-		}else{
+		} else {
 			return false;
 		}
 	}
-
 
 	/** Вернуть записи из указанного столбца
 	 *
 	 * @param string $statement
 	 * @param array $params placeholders
-	 * @param integer $column_number порядковый номер столбца
+	 * @param integer $columnNumber порядковый номер столбца
 	 * @return array
 	 */
-	public function getColumn($statement, $params = array(), $column_number = null){
+	public function getColumn($statement, $params = array(), $columnNumber = null)
+	{
 		$result = $this->query($statement, $params);
 
-		if($result->isExecuted()){
+		if ($result->isExecuted()) {
 			$columns = array();
-			while($new_column = $result->fetchColumn($column_number)){
-				$columns[] = $new_column;
+			
+			while ($new_column = $result->fetchColumn($columnNumber)) {
+				$columns[] = $column;
 			}
 
 			return $columns;
-		}else{
+		} else {
 			return array();
 		}
 	}
@@ -170,32 +177,35 @@ class PDOExtended extends PDO{
 	 *
 	 * @param string $statement
 	 * @param array $params placeholders
-	 * @param string $column_name имя или порядковый номер колонки
+	 * @param string $columnName имя или порядковый номер колонки
 	 *
 	 * @return null|string
 	 */
-	public function getOne($statement, $params = array(), $column_name = 0){
+	public function getOne($statement, $params = array(), $columnName = 0)
+	{
 		$result = $this->query($statement, $params);
 
-		if($result->isExecuted()){
+		if ($result->isExecuted()) {
 			$data = $result->fetch(PDO::FETCH_BOTH);
-			if(isset($data[$column_name])){
-				return $data[$column_name];
-			}else{
+
+			if (isset($data[$columnName])) {
+				return $data[$columnName];
+			} else {
 				return null;
 			}
-		}else{
+			
+		} else {
 			return null;
 		}
 	}
 
 	/** Суммарное время выполнение запросов
 	 * @var float */
-	protected $statistic_time = 0;
+	protected $statisticTime = 0;
 
 	/** Колличество выполенных запросов
 	 * @var integer */
-	protected $statistic_count = 0;
+	protected $statisticCount = 0;
 
 	/** Приплюсовать время выполнения.
 	 * Жаль в php нет friend классов. Не хочу использовать костыли, поэтому
@@ -203,8 +213,9 @@ class PDOExtended extends PDO{
 	 *
 	 * @ignore
 	 */
-	public function _statisticTimeAdd($add_time){
-		$this->statistic_time += $add_time;
+	public function _statisticTimeAdd($addTime)
+	{
+		$this->statisticTime += $addTime;
 	}
 
 	/** Увеличить колличество запросов на единицу.
@@ -213,28 +224,30 @@ class PDOExtended extends PDO{
 	 *
 	 * @ignore
 	 */
-	public function _statisticCountIncriment(){
-		$this->statistic_count++;
+	public function _statisticCountIncriment()
+	{
+		$this->statisticCount++;
 	}
 
 	/** Суммарное время выполнения запросов
 	 *
 	 * @return float
 	 */
-	public function statisticTime(){
-		return $this->statistic_time;
+	public function statisticTime()
+	{
+		return $this->statisticTime;
 	}
 
 	/** Колличество запросов к базе
 	 *
 	 * @return integer
 	 */
-	public function statisticCount(){
-		return $this->statistic_count;
+	public function statisticCount()
+	{
+		return $this->statisticCount;
 	}
+
 }
-
-
 
 class PDOExtendedStatement extends PDOStatement{
 
@@ -244,21 +257,23 @@ class PDOExtendedStatement extends PDOStatement{
 	protected $connection;
 
 	/** @var array */
-	protected $bound_params = array();
+	protected $boundParams = array();
 
-	protected function __construct(PDO $connection){
+	protected function __construct(PDO $connection)
+	{
 		$this->connection = $connection;
 	}
 
 	/** @var boolean */
-	private $flag_error = false;
+	private $flagError = false;
 
 	/** Статус выполнения запроса (true - успешно, false - ошибка)
 	 *
 	 * @return boolean
 	 */
-	public function isExecuted(){
-		return !$this->flag_error;
+	public function isExecuted()
+	{
+		return !$this->flagError;
 	}
 
 	/** Назначить массив плейсхолдеров
@@ -266,9 +281,10 @@ class PDOExtendedStatement extends PDOStatement{
 	 * @param array $array массив со значениями плейсхолдеров
 	 * @return PDOExtendedStatement
 	 */
-	public function bindValueList(array $array){
-		if(is_array($array)){
-			foreach($array as $item => $value){
+	public function bindValueList(array $array)
+	{
+		if (is_array($array)) {
+			foreach ($array as $item => $value) {
 				$this->bindValue($item, $value, PDO::PARAM_STR);
 			}
 		}
@@ -281,18 +297,19 @@ class PDOExtendedStatement extends PDOStatement{
 	 * @param array $input_parameters массив со значениями плейсхолдеров
 	 * @return PDOExtendedStatement
 	 */
-	public function execute($input_parameters = null){
-		$timer_start = microtime(true);
+	public function execute($input_parameters = null)
+	{
+		$timerStart = microtime(true);
 
-		if(parent::execute($input_parameters)){
-			$this->flag_error = false;
-		}else{
-			$this->flag_error = true;
+		if (parent::execute($input_parameters)) {
+			$this->flagError = false;
+		} else {
+			$this->flagError = true;
 		}
 
-		$timer_finish = microtime(true);
+		$timerFinish = microtime(true);
 
-		$this->connection->_statisticTimeAdd($timer_finish - $timer_start);
+		$this->connection->_statisticTimeAdd($timerFinish - $timerStart);
 		$this->connection->_statisticCountIncriment();
 
 		return $this;
@@ -307,10 +324,11 @@ class PDOExtendedStatement extends PDOStatement{
 	 * @param mixed $driverdata
 	 * @return PDOExtendedStatement
 	 */
-	public function bindParam($parameter, &$variable, $type = PDO::PARAM_STR, $maxlen = null, $driverdata = null){
-		$this->bound_params[$parameter] = array(
-			'value' => &$variable,
-			'type' => $type,
+	public function bindParam($parameter, &$variable, $type = PDO::PARAM_STR, $maxlen = null, $driverdata = null)
+	{
+		$this->boundParams[$parameter] = array(
+			'value'	 => &$variable,
+			'type'	 => $type,
 			'maxlen' => (is_null($maxlen)) ? self::NO_MAX_LENGTH : $maxlen,
 		);
 
@@ -326,10 +344,11 @@ class PDOExtendedStatement extends PDOStatement{
 	 * @param integer $data_type тип значения
 	 * @return PDOExtendedStatement
 	 */
-	public function bindValue($parameter, $value, $data_type = PDO::PARAM_STR){
-		$this->bound_params[$parameter] = array(
-			'value' => $value,
-			'type' => $data_type,
+	public function bindValue($parameter, $value, $data_type = PDO::PARAM_STR)
+	{
+		$this->boundParams[$parameter] = array(
+			'value'	 => $value,
+			'type'	 => $data_type,
 			'maxlen' => self::NO_MAX_LENGTH
 		);
 
@@ -343,14 +362,15 @@ class PDOExtendedStatement extends PDOStatement{
 	 * @param array $values
 	 * @return string
 	 */
-	public function getSQL($values = array()){
+	public function buildSQL($values = array())
+	{
 		$sql = $this->queryString;
 
 		/**
 		 * param values
 		 */
-		if(sizeof($values) > 0){
-			foreach($values as $key => $value){
+		if (sizeof($values) > 0) {
+			foreach ($values as $key => $value) {
 				$sql = str_replace($key, $this->connection->quote($value), $sql);
 			}
 		}
@@ -358,21 +378,21 @@ class PDOExtendedStatement extends PDOStatement{
 		/**
 		 * or already bounded values
 		 */
-		if(sizeof($this->bound_params)){
-			foreach($this->bound_params as $key => $param){
+		if (sizeof($this->boundParams)) {
+			foreach ($this->boundParams as $key => $param) {
 				$value = $param['value'];
 
-				if(!is_null($param['type'])){
+				if (!is_null($param['type'])) {
 					$value = self::cast($value, $param['type']);
 				}
 
-				if($param['maxlen'] && $param['maxlen'] != self::NO_MAX_LENGTH){
+				if ($param['maxlen'] && $param['maxlen'] != self::NO_MAX_LENGTH) {
 					$value = self::truncate($value, $param['maxlen']);
 				}
 
-				if(!is_null($value)){
+				if (!is_null($value)) {
 					$sql = str_replace($key, $this->connection->quote($value), $sql);
-				}else{
+				} else {
 					$sql = str_replace($key, 'NULL', $sql);
 				}
 			}
@@ -380,23 +400,27 @@ class PDOExtendedStatement extends PDOStatement{
 		return $sql;
 	}
 
-	static protected function cast($value, $type){
-		switch($type){
+	static protected function cast($value, $type)
+	{
+		switch ($type) {
 			case PDO::PARAM_BOOL:
 				return (bool)$value;
-				break;
+
 			case PDO::PARAM_NULL:
 				return null;
-				break;
+
 			case PDO::PARAM_INT:
 				return (int)$value;
+
 			case PDO::PARAM_STR:
 			default:
 				return $value;
 		}
 	}
 
-	static protected function truncate($value, $length){
+	static protected function truncate($value, $length)
+	{
 		return substr($value, 0, $length);
 	}
+
 }
