@@ -164,7 +164,7 @@ class PDOExtended extends PDO{
 		if ($result->isExecuted()) {
 			$columns = array();
 			
-			while ($new_column = $result->fetchColumn($columnNumber)) {
+			while ($column = $result->fetchColumn($columnNumber)) {
 				$columns[] = $column;
 			}
 
