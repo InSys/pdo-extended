@@ -81,7 +81,7 @@ class PDOExtended extends PDO {
 			self::ATTR_ERRMODE			 => self::ERRMODE_EXCEPTION,
 			self::ATTR_USE_UTF			 => true,
 			self::ATTR_STRICT_MODE		 => true,
-			self::ATTR_TIME_ZONE		 => '+0:00',
+			self::ATTR_TIME_ZONE		 => null,
 		);
 
 		$driverOptions = array_replace($driverOptionsDefault, $driverOptions);
