@@ -21,6 +21,10 @@ class PDOExtended extends PDO{
 		$this->setAttribute(
 			PDO::ATTR_STATEMENT_CLASS, array('PDOExtendedStatement', array($this))
 		);
+		
+		$this->setAttribute(
+			PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION
+		);
 
 		$this->exec("SET NAMES utf8");
 		$this->exec("SET sql_mode='STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE'");
@@ -37,7 +41,7 @@ class PDOExtended extends PDO{
 	public function calcFoundRows()
 	{
 		$result = $this->query('SELECT FOUND_ROWS()');
-		
+
 		$rowCount = (int)$result->fetchColumn();
 
 		return $rowCount;
@@ -163,7 +167,7 @@ class PDOExtended extends PDO{
 
 		if ($result->isExecuted()) {
 			$columns = array();
-			
+
 			while ($column = $result->fetchColumn($columnNumber)) {
 				$columns[] = $column;
 			}
@@ -194,7 +198,7 @@ class PDOExtended extends PDO{
 			} else {
 				return null;
 			}
-			
+
 		} else {
 			return null;
 		}
