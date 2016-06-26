@@ -10,18 +10,18 @@
 class PDOExtended extends PDO {
 
 	/** Только MySQL. Установить все настройки кодировок в UTF-8 (включено по умолчанию).
-	 * @example PDO::setAttribute(PDO::ATTR_USE_UTF, true);
+	 * @example PDO::setAttribute(PDOExtended::ATTR_USE_UTF, true);
 	 */
 	const ATTR_USE_UTF		 = 1001;
 
 	/** Только MySQL. Включить строгий режим (включен по умолчанию).
-	 * @example PDO::setAttribute(PDO::ATTR_STRICT_MODE, true);
+	 * @example PDO::setAttribute(PDOExtended::ATTR_STRICT_MODE, true);
 	 */
 	const ATTR_STRICT_MODE	 = 1002;
 
 	/** Только MySQL. Установить временную зону сервера
-	 * @example PDO::setAttribute(PDO::ATTR_TIME_ZONE, '+0:00');
-	 * @example PDO::setAttribute(PDO::ATTR_TIME_ZONE, null); //Отключить изменение временной зоны сервера
+	 * @example PDO::setAttribute(PDOExtended::ATTR_TIME_ZONE, '+0:00');
+	 * @example PDO::setAttribute(PDOExtended::ATTR_TIME_ZONE, null); //Отключить изменение временной зоны сервера
 	 */
 	const ATTR_TIME_ZONE	 = 1003;
 
