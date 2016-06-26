@@ -531,7 +531,7 @@ class PDOExtendedStatement extends PDOStatement{
 		 */
 		if (sizeof($values) > 0) {
 			foreach ($values as $key => $value) {
-				$sql = str_replace($key, $this->connection->quote($value), $sql);
+				$sql = str_replace(':' . $key, $this->connection->quote($value), $sql);
 			}
 		}
 
