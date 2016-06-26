@@ -1,37 +1,174 @@
 <?php
 /** Расширение для класса PDO
  *
- * @version 1.1
+ * @version 2.0
  * @author Insys <intsystem88@gmail.com>
  * @copyright (c) 2013, Insys
  * @link https://github.com/InSys/pdo-extended
  * @license http://opensource.org/licenses/GPL-2.0 The GNU General Public License (GPL-2.0)
  */
-class PDOExtended extends PDO{
+class PDOExtended extends PDO {
 
-	public function __construct($dsn, $username = null, $password = null, $driver_options = array())
+	/** Только MySQL. Установить все настройки кодировок в UTF-8 (включено по умолчанию).
+	 * @example PDO::setAttribute(PDO::ATTR_USE_UTF, true);
+	 */
+	const ATTR_USE_UTF		 = 1001;
+
+	/** Только MySQL. Включить строгий режим (включен по умолчанию).
+	 * @example PDO::setAttribute(PDO::ATTR_STRICT_MODE, true);
+	 */
+	const ATTR_STRICT_MODE	 = 1002;
+
+	/** Только MySQL. Установить временную зону сервера
+	 * @example PDO::setAttribute(PDO::ATTR_TIME_ZONE, '+0:00');
+	 * @example PDO::setAttribute(PDO::ATTR_TIME_ZONE, null); //Отключить изменение временной зоны сервера
+	 */
+	const ATTR_TIME_ZONE	 = 1003;
+
+
+	private $optionsOverload = array(
+		self::ATTR_STRICT_MODE,
+		self::ATTR_TIME_ZONE,
+		self::ATTR_USE_UTF
+	);
+	private $optionsValues = array();
+
+	
+	public function __construct($dsn, $username = null, $password = null, $driverOptions = array())
 	{
-		if (isset($driver_options[PDO::ATTR_PERSISTENT])) {
-			trigger_error(__METHOD__ . ': PDOExtended can not work with PDO::ATTR_PERSISTENT', E_USER_WARNING);
-			unset($driver_options[PDO::ATTR_PERSISTENT]);
-		}
+		$driverOptions = $this->initOptions($driverOptions);
 
-		parent::__construct($dsn, $username, $password, $driver_options);
+		parent::__construct($dsn, $username, $password, $driverOptions);
 
-		$this->setAttribute(
-			PDO::ATTR_STATEMENT_CLASS, array('PDOExtendedStatement', array($this))
-		);
-		
-		$this->setAttribute(
-			PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION
-		);
-
-		$this->exec("SET NAMES utf8");
-		$this->exec("SET sql_mode='STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE'");
-		$this->exec("SET time_zone = '+0:00'");
+		$this->initClass();
 
 		$this->statisticCount	 = 0;
 		$this->statisticTime	 = 0;
+	}
+
+	/** Инициализация класса/подключения
+	 *
+	 */
+	protected function initClass()
+	{
+		$driver = $this->getAttribute(PDO::ATTR_DRIVER_NAME);
+		
+		if ($driver == 'mysql') {
+			if ($this->getAttribute(self::ATTR_USE_UTF)) {
+				$this->exec("SET NAMES utf8 COLLATE utf8_general_ci");
+				$this->exec("SET CHARACTER SET utf8");
+			}
+
+			if ($this->getAttribute(self::ATTR_STRICT_MODE)) {
+				$this->exec("SET sql_mode='STRICT_TRANS_TABLES,NO_ZERO_DATE,NO_ZERO_IN_DATE'");
+			}
+
+			if ($this->getAttribute(self::ATTR_TIME_ZONE)) {
+				$this->exec("SET time_zone=?" , array($this->getAttribute(self::ATTR_TIME_ZONE)));
+			}
+		}
+	}
+
+	/** Инициализация массива настроек
+	 *
+	 * @param array $driverOptions
+	 * @return array
+	 */
+	protected function initOptions($driverOptions)
+	{
+		$driverOptionsDefault = array(
+			self::ATTR_STATEMENT_CLASS	 => array('PDOExtendedStatement', array($this)),
+			self::ATTR_ERRMODE			 => self::ERRMODE_EXCEPTION,
+			self::ATTR_USE_UTF			 => true,
+			self::ATTR_STRICT_MODE		 => true,
+			self::ATTR_TIME_ZONE		 => '+0:00',
+		);
+
+		$driverOptions = array_replace($driverOptionsDefault, $driverOptions);
+
+		$errorLevel = isset($driverOptions[self::ATTR_ERRMODE]) ? $driverOptions[self::ATTR_ERRMODE] : self::ERRMODE_SILENT;
+
+		foreach ($driverOptions as $driverAttr => $driverValue) {
+			if (in_array($driverAttr, $this->optionsOverload)) {
+				$this->optionsValues[$driverAttr] = $driverValue;
+				unset($driverOptions[$driverAttr]);
+				continue;
+			}
+
+			if (($driverAttr == self::ATTR_PERSISTENT) && ($driverValue == true)) {
+				$this->throwError(get_class() . ' can not work with ATTR_PERSISTENT', null, $errorLevel);
+				unset($driverOptions[$driverAttr]);
+				continue;
+			}
+		}
+
+		return $driverOptions;
+	}
+
+	/** Присвоение атрибута
+	 *
+	 * @param int $attribute
+	 * @param mixed $value
+	 * @return boolean
+	 */
+	public function setAttribute($attribute, $value)
+	{
+		if (($attribute == self::ATTR_PERSISTENT) && ($value == true)) {
+			$this->throwError(get_class() . ' can not work with ATTR_PERSISTENT');
+			return false;
+		}
+
+		if (in_array($attribute, $this->optionsOverload)) {
+			$this->optionsValues[$attribute] = $value;
+			return true;
+		}
+
+		return parent::setAttribute($attribute, $value);
+	}
+
+	/** Получение атрибута
+	 *
+	 * @param int $attribute
+	 * @return mixed
+	 */
+	public function getAttribute($attribute)
+	{
+		if (in_array($attribute, $this->optionsOverload)) {
+			if ( isset($this->optionsValues[$attribute]) ) {
+				return $this->optionsValues[$attribute];
+			}
+
+			return null;
+		}
+		
+		return parent::getAttribute($attribute);
+	}
+
+	/** Вывести ошибку в соответствии с текущими настройками
+	 *
+	 * @param string $message
+	 * @param int $code
+	 * @throws PDOException
+	 */
+	protected function throwError($message, $code = null, $errorLevel = null)
+	{
+		if (is_null($errorLevel)) {
+			$errorLevel = $this->getAttribute(self::ATTR_ERRMODE);
+		}
+
+		switch ($errorLevel) {
+			case self::ERRMODE_EXCEPTION:
+				throw new PDOException($message, $code);
+				break;
+
+			case self::ERRMODE_WARNING:
+				trigger_error(__METHOD__ . ': ' . $code . ' ' . $message, E_USER_WARNING);
+				break;
+
+			case self::ERRMODE_SILENT:
+			default:
+				break;
+		}
 	}
 
 	/** Получить результат SQL_CALC_FOUND_ROWS
@@ -40,11 +177,29 @@ class PDOExtended extends PDO{
 	 */
 	public function calcFoundRows()
 	{
-		$result = $this->query('SELECT FOUND_ROWS()');
+		$driver = $this->getAttribute(PDO::ATTR_DRIVER_NAME);
 
-		$rowCount = (int)$result->fetchColumn();
+		if ($driver == 'mysql') {
+			$result = $this->query('SELECT FOUND_ROWS()');
 
-		return $rowCount;
+			$rowCount = (int)$result->fetchColumn();
+
+			return $rowCount;
+		}
+
+		$this->throwError('calcFoundRows() not implemented for ' . $driver);
+
+		return null;
+	}
+
+	/** Возвращает ID последней вставленной строки или последовательное значение
+	 * Алиас для PDO::lastInsertId();
+	 *
+	 * @return integer
+	 */
+	public function calcLastInsertId()
+	{
+		return $this->lastInsertId();
 	}
 
 	/** Подготавливает запрос к выполнению и возвращает ассоциированный с этим запросом объект
